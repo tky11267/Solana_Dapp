@@ -96,23 +96,23 @@ export default function App() {
    * This function is called when the Create a New Solana Account button is clicked
    */
   const createSender = async () => {
-    // create a new Keypair
+    try {
+      // Generate a new keypair
+      const senderKeypair = Keypair.generate();
 
+      // Airdrop 2 SOL to the new account
+      await connection.requestAirdrop(senderKeypair.publicKey, LAMPORTS_PER_SOL * 2);
 
-    console.log('Sender account: ', senderKeypair!.publicKey.toString());
-    console.log('Airdropping 2 SOL to Sender Wallet');
+      // Update senderKeypair state
+      setSenderKeypair(senderKeypair);
 
-    // save this new KeyPair into this state variable
-    setSenderKeypair(/*KeyPair here*/);
-
-    // request airdrop into this new account
-    
-
-    const latestBlockHash = await connection.getLatestBlockhash();
-
-    // now confirm the transaction
-
-    console.log('Wallet Balance: ' + (await connection.getBalance(senderKeypair!.publicKey)) / LAMPORTS_PER_SOL);
+      // Log sender account and balance
+      console.log('Sender account: ', senderKeypair.publicKey.toString());
+      console.log('Airdropped 2 SOL to Sender Wallet');
+      console.log('Wallet Balance: ' + (await connection.getBalance(senderKeypair.publicKey)) / LAMPORTS_PER_SOL);
+    } catch (error) {
+      console.error('Error creating sender account:', error);
+    }
   }
 
   /**
@@ -123,13 +123,10 @@ export default function App() {
     // @ts-ignore
     const { solana } = window;
 
-    // checks if phantom wallet exists
     if (solana) {
       try {
-        // connect to phantom wallet and return response which includes the wallet public key
-
-        // save the public key of the phantom wallet to the state variable
-        setReceiverPublicKey(/*PUBLIC KEY*/);
+        const response = await solana.connect();
+        setReceiverPublicKey(new PublicKey(response.publicKey.toString()));
       } catch (err) {
         console.log(err);
       }
@@ -144,12 +141,11 @@ export default function App() {
     // @ts-ignore
     const { solana } = window;
 
-    // checks if phantom wallet exists
     if (solana) {
       try {
-        solana.disconnect();
+        await solana.disconnect();
         setReceiverPublicKey(undefined);
-        console.log("wallet disconnected")
+        console.log("Wallet disconnected");
       } catch (err) {
         console.log(err);
       }
@@ -160,22 +156,36 @@ export default function App() {
    * @description transfer SOL from sender wallet to connected wallet.
    * This function is called when the Transfer SOL to Phantom Wallet button is clicked
    */
-  const transferSol = async () => {    
-    
-    // create a new transaction for the transfer
+  const transferSol = async () => {
+    if (!senderKeypair || !receiverPublicKey) {
+      console.error('Sender keypair or receiver public key missing');
+      return;
+    }
 
-    // send and confirm the transaction
+    try {
+      // Construct a transfer transaction
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: senderKeypair.publicKey,
+          toPubkey: receiverPublicKey,
+          lamports: LAMPORTS_PER_SOL,
+        })
+      );
+       // Sign and send the transaction
+       await sendAndConfirmTransaction(connection, transaction, [senderKeypair]);
 
-    console.log("transaction sent and confirmed");
-    console.log("Sender Balance: " + await connection.getBalance(senderKeypair!.publicKey) / LAMPORTS_PER_SOL);
-    console.log("Receiver Balance: " + await connection.getBalance(receiverPublicKey!) / LAMPORTS_PER_SOL);
-  };
-
+       console.log('Transaction sent and confirmed');
+       console.log('Sender Balance: ' + (await connection.getBalance(senderKeypair.publicKey)) / LAMPORTS_PER_SOL);
+       console.log('Receiver Balance: ' + (await connection.getBalance(receiverPublicKey)) / LAMPORTS_PER_SOL);
+     } catch (error) {
+       console.error('Error transferring SOL:', error);
+     }
+   };
   // HTML code for the app
   return (
     <div className="App">
       <header className="App-header">
-        <h2>Module 2 Assessment</h2>
+        <h2>Solana Bank</h2>
         <span className ="buttons">
           <button
             style={{
